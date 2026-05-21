@@ -8,7 +8,7 @@ class DataProcessor:
         self.silver_path = silver_path
         self.gold_path = gold_path
         
-        # Ne asigurăm că folderele de destinație există fizic
+        # Ne asigurăm că folderele există
         os.makedirs(self.silver_path, exist_ok=True)
         os.makedirs(self.gold_path, exist_ok=True)
 
@@ -18,12 +18,18 @@ class DataProcessor:
         
         # 1. Consolidare Rezultate
         all_dfs = []
-        files = [f for f in os.listdir(self.bronze_path) if 'Results' in f and f.endswith('.csv')]
+        # Acceptăm și .csv și .xlsx/.xls, indiferent de majuscule/minușcule
+        files = [f for f in os.listdir(self.bronze_path) if 'Results' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         
         for file in files:
-            df = pd.read_csv(os.path.join(self.bronze_path, file))
+            file_path = os.path.join(self.bronze_path, file)
+            # Detectăm extensia și citim cu funcția potrivită
+            if file.lower().endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
             
-            # Extragere an folosind Regex (caută primele 4 cifre din nume)
+            # Extragere an cu Regex
             year_match = re.search(r'\d{4}', file)
             df['Year'] = int(year_match.group()) if year_match else 2015
             
@@ -32,24 +38,33 @@ class DataProcessor:
                 
             all_dfs.append(df)
         
+        if not all_dfs:
+            raise ValueError(f"❌ Nu am găsit niciun fișier de rezultate în {self.bronze_path}. Verifică folderul!")
+        
         silver_results = pd.concat(all_dfs, ignore_index=True)
         silver_results['Place'] = silver_results['Place'].astype(str).str.upper().str.strip()
         silver_results.to_csv(os.path.join(self.silver_path, "silver_results.csv"), index=False)
         
         # 2. Curățare Certificări
-        cert_file = [f for f in os.listdir(self.bronze_path) if 'Certifications' in f][0]
-        certs = pd.read_csv(os.path.join(self.bronze_path, cert_file))
-        certs = certs.rename(columns={
-            'Mental Handicap (SOB has this certificate)': 'Mental_Handicap',
-            'Unified Partner (SOB has this certificate)': 'Unified_Partner'
-        })
-        certs.to_csv(os.path.join(self.silver_path, "silver_certifications.csv"), index=False)
+        cert_files = [f for f in os.listdir(self.bronze_path) if 'Certifications' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+        if cert_files:
+            cert_file = cert_files[0]
+            cert_path = os.path.join(self.bronze_path, cert_file)
+            certs = pd.read_csv(cert_path) if cert_file.lower().endswith('.csv') else pd.read_excel(cert_path)
+            certs = certs.rename(columns={
+                'Mental Handicap (SOB has this certificate)': 'Mental_Handicap',
+                'Unified Partner (SOB has this certificate)': 'Unified_Partner'
+            })
+            certs.to_csv(os.path.join(self.silver_path, "silver_certifications.csv"), index=False)
         
         # 3. Curățare Cluburi
-        club_file = [f for f in os.listdir(self.bronze_path) if 'Clubs' in f][0]
-        clubs = pd.read_csv(os.path.join(self.bronze_path, club_file))
-        clubs = clubs.rename(columns={'Group number': 'Club_ID', 'Name': 'Club_Name'})
-        clubs.to_csv(os.path.join(self.silver_path, "silver_clubs.csv"), index=False)
+        club_files = [f for f in os.listdir(self.bronze_path) if 'Clubs' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+        if club_files:
+            club_file = club_files[0]
+            club_path = os.path.join(self.bronze_path, club_file)
+            clubs = pd.read_csv(club_path) if club_file.lower().endswith('.csv') else pd.read_excel(club_path)
+            clubs = clubs.rename(columns={'Group number': 'Club_ID', 'Name': 'Club_Name'})
+            clubs.to_csv(os.path.join(self.silver_path, "silver_clubs.csv"), index=False)
         
         print("✅ Silver layer built successfully!")
 
@@ -57,7 +72,6 @@ class DataProcessor:
         """PHASE 2: Transformă datele din Silver în modelul Star Schema pentru Gold."""
         print("🏗️ Transforming Silver data into Gold Star Schema...")
         
-        # Încărcăm datele curate din Silver
         results_df = pd.read_csv(os.path.join(self.silver_path, "silver_results.csv"))
         certs_df = pd.read_csv(os.path.join(self.silver_path, "silver_certifications.csv"))
         clubs_df = pd.read_csv(os.path.join(self.silver_path, "silver_clubs.csv"))
