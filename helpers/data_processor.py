@@ -8,28 +8,28 @@ class DataProcessor:
         self.silver_path = silver_path
         self.gold_path = gold_path
         
-        # Ne asigurăm că folderele există
+        # Ensure destination directories exist
         os.makedirs(self.silver_path, exist_ok=True)
         os.makedirs(self.gold_path, exist_ok=True)
 
     def process_bronze_to_silver(self):
-        """PHASE 1: Curăță și consolidează datele brute în stratul Silver."""
+        """PHASE 1: Clean and consolidate raw data into the Silver layer."""
         print("🧹 Cleaning and consolidating raw data into Silver layer...")
         
-        # 1. Consolidare Rezultate
+        # 1. Consolidate Results Data
         all_dfs = []
-        # Acceptăm și .csv și .xlsx/.xls, indiferent de majuscule/minușcule
+        # Accept both .csv and .xlsx/.xls dynamically, regardless of casing
         files = [f for f in os.listdir(self.bronze_path) if 'Results' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         
         for file in files:
             file_path = os.path.join(self.bronze_path, file)
-            # Detectăm extensia și citim cu funcția potrivită
+            # Detect file extension and read with the appropriate function
             if file.lower().endswith('.csv'):
                 df = pd.read_csv(file_path)
             else:
                 df = pd.read_excel(file_path)
             
-            # Extragere an cu Regex
+            # Extract competition year using Regex (finds the first 4-digit sequence)
             year_match = re.search(r'\d{4}', file)
             df['Year'] = int(year_match.group()) if year_match else 2015
             
@@ -39,13 +39,13 @@ class DataProcessor:
             all_dfs.append(df)
         
         if not all_dfs:
-            raise ValueError(f"❌ Nu am găsit niciun fișier de rezultate în {self.bronze_path}. Verifică folderul!")
+            raise ValueError(f"❌ No results files found in {self.bronze_path}. Please check the directory!")
         
         silver_results = pd.concat(all_dfs, ignore_index=True)
         silver_results['Place'] = silver_results['Place'].astype(str).str.upper().str.strip()
         silver_results.to_csv(os.path.join(self.silver_path, "silver_results.csv"), index=False)
         
-        # 2. Curățare Certificări
+        # 2. Clean Certifications Data
         cert_files = [f for f in os.listdir(self.bronze_path) if 'Certifications' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         if cert_files:
             cert_file = cert_files[0]
@@ -57,7 +57,7 @@ class DataProcessor:
             })
             certs.to_csv(os.path.join(self.silver_path, "silver_certifications.csv"), index=False)
         
-        # 3. Curățare Cluburi
+        # 3. Clean Clubs Data
         club_files = [f for f in os.listdir(self.bronze_path) if 'Clubs' in f and f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         if club_files:
             club_file = club_files[0]
@@ -69,9 +69,10 @@ class DataProcessor:
         print("✅ Silver layer built successfully!")
 
     def build_gold_star_schema(self):
-        """PHASE 2: Transformă datele din Silver în modelul Star Schema pentru Gold."""
+        """PHASE 2: Transform Silver data into a functional Star Schema in the Gold layer."""
         print("🏗️ Transforming Silver data into Gold Star Schema...")
         
+        # Load clean data from Silver layer
         results_df = pd.read_csv(os.path.join(self.silver_path, "silver_results.csv"))
         certs_df = pd.read_csv(os.path.join(self.silver_path, "silver_certifications.csv"))
         clubs_df = pd.read_csv(os.path.join(self.silver_path, "silver_clubs.csv"))

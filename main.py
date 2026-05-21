@@ -2,33 +2,33 @@ from helpers.data_processor import DataProcessor
 from helpers.db_manager import DBManager
 
 def main():
-    # 1. Configurații structură Medallion
+    # 1. Medallion architecture paths configuration
     BRONZE = "data/bronze"
     SILVER = "data/silver"
     GOLD = "data/gold"
     
-    # DATELE DE CONECTARE MYSQL
+    # MySQL Database Connection Details
     DB_USER = "root"
-    DB_PASS = "parola"  # Înlocuiește cu parola ta reală
+    DB_PASS = "parola"  # Replace with your actual database password
     DB_HOST = "localhost"
     DB_NAME = "special_olympics_r0975016"
 
-    # 2. Inițializare motor ETL
+    # 2. Initialize the ETL Data Processor
     dp = DataProcessor(BRONZE, SILVER, GOLD)
     
     print("--- 🛠️ Starting Medallion ETL Pipeline ---")
     
-    # Pasul A: Bronze -> Silver (Curățare brută)
+    # Step A: Bronze -> Silver (Data Cleaning & Consolidation)
     dp.process_bronze_to_silver()
     
-    # Pasul B: Silver -> Gold (Modelare Dimensională / Star Schema)
+    # Step B: Silver -> Gold (Dimensional Modeling / Star Schema)
     dp.build_gold_star_schema()
     
-    # Pasul C: Gold -> MySQL Production Data Warehouse
+    # Step C: Gold -> MySQL Production Data Warehouse Ingestion
     print("\n--- 🚀 Loading Gold Production Data into MySQL ---")
     try:
         db = DBManager(DB_USER, DB_PASS, DB_HOST, DB_NAME)
-        # Încărcăm tabelele de tip Gold direct în baza de date
+        # Upload Gold tables directly into production warehouse
         db.upload_to_mysql(GOLD)
         print("--- ✅ ALL PHASES COMPLETE: Gold Data is Live in MySQL Data Warehouse! ---")
     except Exception as e:
