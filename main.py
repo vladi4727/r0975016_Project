@@ -2,42 +2,37 @@ from helpers.data_processor import DataProcessor
 from helpers.db_manager import DBManager
 
 def main():
-    # 1. Configurații
+    # 1. Configurații structură Medallion
     BRONZE = "data/bronze"
     SILVER = "data/silver"
+    GOLD = "data/gold"
     
-    # DATELE TALE DE CONECTARE (Pune parola setata la instalare)
+    # DATELE DE CONECTARE MYSQL
     DB_USER = "root"
-    DB_PASS = "parola" 
+    DB_PASS = "parola"  # Înlocuiește cu parola ta reală
     DB_HOST = "localhost"
     DB_NAME = "special_olympics_r0975016"
 
-    # 2. Pornim motorul de procesare
-    dp = DataProcessor(BRONZE, SILVER)
+    # 2. Inițializare motor ETL
+    dp = DataProcessor(BRONZE, SILVER, GOLD)
     
-    print("--- 🛠️ Starting ETL Pipeline (Bronze -> Silver) ---")
-    results = dp.process_results()
-    dp.save_to_silver(results, "fact_results")
+    print("--- 🛠️ Starting Medallion ETL Pipeline ---")
     
-    athletes = dp.process_athletes(results)
-    dp.save_to_silver(athletes, "dim_athlete")
+    # Pasul A: Bronze -> Silver (Curățare brută)
+    dp.process_bronze_to_silver()
     
-    clubs = dp.process_clubs()
-    dp.save_to_silver(clubs, "dim_club")
+    # Pasul B: Silver -> Gold (Modelare Dimensională / Star Schema)
+    dp.build_gold_star_schema()
     
-    # Dim Sport simplu
-    sports = results[['Sport']].drop_duplicates().reset_index(drop=True)
-    sports['Sport_ID'] = sports.index + 1
-    dp.save_to_silver(sports, "dim_sport")
-
-    # 3. 🚀 BONUS: Încărcarea în MySQL (Medallion: Silver -> Gold/Prod)
-    print("\n--- 🏗️ Starting Database Ingestion (MySQL Bonus) ---")
+    # Pasul C: Gold -> MySQL Production Data Warehouse
+    print("\n--- 🚀 Loading Gold Production Data into MySQL ---")
     try:
         db = DBManager(DB_USER, DB_PASS, DB_HOST, DB_NAME)
-        db.upload_to_mysql(SILVER)
-        print("--- ✅ Phase 2 COMPLETE: Data is live in MySQL! ---")
+        # Încărcăm tabelele de tip Gold direct în baza de date
+        db.upload_to_mysql(GOLD)
+        print("--- ✅ ALL PHASES COMPLETE: Gold Data is Live in MySQL Data Warehouse! ---")
     except Exception as e:
-        print(f"--- ❌ MySQL Error: {e} ---")
+        print(f"--- ❌ MySQL Ingestion Error: {e} ---")
 
 if __name__ == "__main__":
     main()
